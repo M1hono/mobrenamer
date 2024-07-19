@@ -1,2 +1,3 @@
 # mobrenamer
-A mob to modify spawned mobs.
+
+A mod to modify spawned mobs.
