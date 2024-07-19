@@ -1,4 +1,4 @@
-package org.m1hono.datapack;
+package org.m1hono.mobrenamer.datapack;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
