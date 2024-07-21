@@ -1,14 +1,17 @@
 package org.m1hono.mobrenamer.events;
 
+import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceKey;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
-import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraftforge.event.AddReloadListenerEvent;
 import net.minecraftforge.event.entity.living.MobSpawnEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -36,7 +39,7 @@ public class ServerEvents {
 
     @SubscribeEvent
     public static void onMobSpawn(@NotNull MobSpawnEvent event) {
-        LivingEntity entity = event.getEntity();
+        Mob entity = event.getEntity();
         if (!(entity instanceof Mob)) {
             return;
         }
@@ -49,7 +52,9 @@ public class ServerEvents {
         if (mobDef == null) {
             return;
         }
-
+        if (!(entity.getSpawnType() == MobSpawnType.NATURAL)) {
+            return;
+        }
         NameConfig selectedName = selectName(mobDef, entity);
         if (selectedName != null) {
             entity.setCustomName(selectedName.name());
@@ -57,7 +62,6 @@ public class ServerEvents {
             applyAttributes(entity, selectedName.attributes());
         }
     }
-
     private static NameConfig selectName(MobDef mobDef, LivingEntity entity) {
         List<NameConfig> validNames = mobDef.names().stream()
                 .filter(nameConfig -> isValidForLocation(nameConfig, entity))
@@ -92,18 +96,16 @@ public class ServerEvents {
         BlockPos pos = entity.blockPosition();
         ServerLevel level = (ServerLevel) entity.level();
 
-//        if (!nameConfig.structures().isEmpty()) {
-//            boolean foundMatchingStructure = level.structureManager().getAllStructuresAt(pos).keySet().stream()
-//                    .map(ResourceKey::location)
-//                    .anyMatch(nameConfig.structures()::contains);
-//            if (!foundMatchingStructure) {
-//                return false;
-//            }
-//        }
-
-        if (!nameConfig.biomes().isEmpty()) {
-            Optional<ResourceKey<Biome>> biomeKey = level.getBiome(pos).unwrapKey();
-            if (biomeKey.isEmpty() || !nameConfig.biomes().contains(biomeKey.get().location())) {
+        if (!nameConfig.structures().isEmpty()) {
+            Map<Structure, LongSet> structuresAtPos = getStructuresAtPos(level, pos);
+            boolean inSpecifiedStructure = structuresAtPos.keySet().stream()
+                    .anyMatch(structure -> {
+                        ResourceLocation structureId = level.registryAccess()
+                                .registryOrThrow(Registries.STRUCTURE)
+                                .getKey(structure);
+                        return nameConfig.structures().contains(structureId);
+                    });
+            if (!inSpecifiedStructure) {
                 return false;
             }
         }
@@ -113,6 +115,15 @@ public class ServerEvents {
         }
 
         return true;
+    }
+
+    private static Map<Structure, LongSet> getStructuresAtPos(ServerLevel level, BlockPos pos) {
+        StructureManager structureManager = level.structureManager();
+        Map<Structure, LongSet> structuresAtPos = structureManager.getAllStructuresAt(pos);
+        if (structuresAtPos.isEmpty()) {
+            return new HashMap<>();
+        }
+        return structuresAtPos;
     }
 
     private static void applyAttributes(LivingEntity entity, Map<ResourceLocation, Double> attributes) {
