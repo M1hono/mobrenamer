@@ -11,6 +11,7 @@ public record MobDef(
         boolean alwaysNamed,
         List<NameConfig> names
 ) {
+
     public static final Codec<MobDef> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             ResourceLocation.CODEC.fieldOf("type").forGetter(MobDef::type),
             Codec.BOOL.fieldOf("always_named").forGetter(MobDef::alwaysNamed),

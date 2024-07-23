@@ -20,7 +20,6 @@ public record NameConfig(
             Component.Serializer::fromJson,
             Component.Serializer::toJson
     );
-
     public static final Codec<NameConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             COMPONENT_CODEC.fieldOf("name").forGetter(NameConfig::name),
             Codec.DOUBLE.fieldOf("probability").forGetter(NameConfig::probability),

@@ -47,7 +47,6 @@ public class ServerEvents {
         if (entityType == null) {
             return;
         }
-
         MobDef mobDef = MobRenamer.getMobDefManager().getMobDef(entityType);
         if (mobDef == null) {
             return;

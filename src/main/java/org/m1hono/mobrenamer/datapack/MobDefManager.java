@@ -45,7 +45,6 @@ public class MobDefManager extends SimplePreparableReloadListener<List<MobDef>> 
                 LOGGER.error("Failed to read mob definition {}: {}", location, e.getMessage(), e);
             }
         }
-
         LOGGER.info("Loaded {} mob definition files", definitions.size());
         pProfiler.pop();
         pProfiler.endTick();
