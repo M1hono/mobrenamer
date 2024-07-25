@@ -61,9 +61,18 @@ public class ServerEvents {
     private static NameConfig selectName(MobDef mobDef, LivingEntity entity, MobSpawnType spawnType) {
         List<NameConfig> allNames = mobDef.names();
         int size = allNames.size();
+        System.out.println("Size: " + size);
 
         if (size == 0) {
             return null;
+        }
+
+        if (size == 1) {
+            NameConfig singleConfig = allNames.get(0);
+            if (isValidForLocation(singleConfig, entity) && isValidForSpawnType(singleConfig, spawnType)) {
+                return singleConfig;
+            }
+            return mobDef.alwaysNamed() ? singleConfig : null;
         }
 
         int iterations = Math.min(MAX_ITERATIONS, (int) (Math.log(size) / Math.log(2)) * 10);
@@ -86,11 +95,12 @@ public class ServerEvents {
                 return nameConfig;
             }
         }
+
         if (mobDef.alwaysNamed()) {
             return allNames.get(0);
-        } else {
-            return null;
         }
+
+        return null;
     }
 
     private static boolean isValidForLocation(NameConfig nameConfig, LivingEntity entity) {
@@ -107,7 +117,6 @@ public class ServerEvents {
                         return nameConfig.structures().contains(structureId);
                     });
             if (!inSpecifiedStructure) {
-                LOGGER.debug("Entity not in specified structure for NameConfig: {}", nameConfig.name().getString());
                 return false;
             }
         }
@@ -115,13 +124,11 @@ public class ServerEvents {
         if (!nameConfig.biomes().isEmpty()) {
             ResourceLocation biomeId = level.getBiome(pos).unwrapKey().orElseThrow().location();
             if (!nameConfig.biomes().contains(biomeId)) {
-                LOGGER.debug("Entity not in specified biome for NameConfig: {}", nameConfig.name().getString());
                 return false;
             }
         }
 
         if (!nameConfig.dimensions().isEmpty() && !nameConfig.dimensions().contains(level.dimension().location())) {
-            LOGGER.debug("Entity not in specified dimension for NameConfig: {}", nameConfig.name().getString());
             return false;
         }
 
