@@ -22,21 +22,17 @@ import org.m1hono.mobrenamer.MobRenamer;
 import org.m1hono.mobrenamer.datapack.MobDef;
 import org.m1hono.mobrenamer.datapack.MobDefManager;
 import org.m1hono.mobrenamer.datapack.NameConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
 @Mod.EventBusSubscriber(modid = MobRenamer.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class ServerEvents {
-    private static final Logger LOGGER = LoggerFactory.getLogger(ServerEvents.class);
     private static final MobDefManager MOB_DEF_MANAGER = new MobDefManager();
     private static final int MAX_ITERATIONS = 100;
 
     @SubscribeEvent
     public static void onServerReloading(AddReloadListenerEvent event) {
         event.addListener(MOB_DEF_MANAGER);
-        LOGGER.info("MobDefManager added as a reload listener");
     }
 
     @SubscribeEvent
