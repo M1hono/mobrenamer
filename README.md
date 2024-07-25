@@ -2,8 +2,6 @@
 
 ## A mod to modify spawned mobs.
 
----
-
 This mod uses a JSON configuration file, making it easy to customize without needing to modify code.
 
 What's more, instead of using string to configure names.
