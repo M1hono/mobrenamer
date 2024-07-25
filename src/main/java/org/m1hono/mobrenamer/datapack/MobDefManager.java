@@ -15,17 +15,17 @@ import org.slf4j.Logger;
 import java.io.BufferedReader;
 import java.util.*;
 
-public class MobDefManager extends SimplePreparableReloadListener<List<MobDef>> {
+public class MobDefManager extends SimplePreparableReloadListener<Map<ResourceLocation, MobDef>> {
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final String FOLDER = "mobrenamer";
+    private static final String FOLDER = "definitions";
     private final Map<ResourceLocation, MobDef> loader = new HashMap<>();
 
     @Override
-    protected @NotNull List<MobDef> prepare(ResourceManager pResourceManager, ProfilerFiller pProfiler) {
+    protected @NotNull Map<ResourceLocation, MobDef> prepare(ResourceManager pResourceManager, ProfilerFiller pProfiler) {
         pProfiler.startTick();
         pProfiler.push("Loading mob definitions");
 
-        List<MobDef> definitions = new ArrayList<>();
+        Map<ResourceLocation, MobDef> tempLoader = new HashMap<>();
         LOGGER.info("Searching for mob definitions in namespace: {}", FOLDER);
         Map<ResourceLocation, Resource> resources = pResourceManager.listResources(FOLDER, location -> location.getPath().endsWith(".json"));
         LOGGER.info("Found {} resources", resources.size());
@@ -35,28 +35,40 @@ public class MobDefManager extends SimplePreparableReloadListener<List<MobDef>> 
             LOGGER.info("Processing resource: {}", location);
             try (BufferedReader reader = entry.getValue().openAsReader()) {
                 JsonElement jsonElement = JsonParser.parseReader(reader);
-                MobDef.CODEC.parse(JsonOps.INSTANCE, jsonElement)
-                        .resultOrPartial(error -> LOGGER.warn("Failed to parse mob definition {}: {}", location, error))
-                        .ifPresent(mobDef -> {
-                            definitions.add(mobDef);
-                            LOGGER.info("Successfully loaded mob definition from {}", location);
+                MobDefData.CODEC.parse(JsonOps.INSTANCE, jsonElement)
+                        .resultOrPartial(error -> LOGGER.error("Failed to parse mob definitions {}: {}", location, error))
+                        .ifPresent(mobDefData -> {
+                            for (Map.Entry<ResourceLocation, MobDef> defEntry : mobDefData.mobDefinitions().entrySet()) {
+                                ResourceLocation type = defEntry.getKey();
+                                MobDef def = defEntry.getValue();
+                                if (tempLoader.containsKey(type)) {
+                                    tempLoader.computeIfPresent(type, (k, existingDef) -> existingDef.merge(def));
+                                } else {
+                                    tempLoader.put(type, def);
+                                }
+                                LOGGER.info("Successfully loaded mob definition for type: {}", type);
+                            }
                         });
             } catch (Exception e) {
-                LOGGER.error("Failed to read mob definition {}: {}", location, e.getMessage(), e);
+                LOGGER.error("Failed to read mob definitions {}: {}", location, e.getMessage(), e);
             }
         }
-        LOGGER.info("Loaded {} mob definition files", definitions.size());
+
+        // Sort NameConfigs by priority for each MobDef
+        for (MobDef mobDef : tempLoader.values()) {
+            mobDef.names().sort(Comparator.comparingInt(NameConfig::priority).reversed());
+        }
+        LOGGER.info("Loaded {} mob definition.", tempLoader);
+        LOGGER.info("Loaded {} mob definitions", tempLoader.size());
         pProfiler.pop();
         pProfiler.endTick();
-        return definitions;
+        return tempLoader;
     }
 
     @Override
-    protected void apply(@NotNull List<MobDef> mobDefs, @NotNull ResourceManager pResourceManager, @NotNull ProfilerFiller pProfiler) {
+    protected void apply(@NotNull Map<ResourceLocation, MobDef> mobDefs, @NotNull ResourceManager pResourceManager, @NotNull ProfilerFiller pProfiler) {
         loader.clear();
-        for (MobDef def : mobDefs) {
-            loader.put(def.type(), def);
-        }
+        loader.putAll(mobDefs);
         LOGGER.info("Applied {} mob definitions", loader.size());
     }
 

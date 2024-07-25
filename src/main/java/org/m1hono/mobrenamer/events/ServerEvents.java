@@ -31,62 +31,64 @@ import java.util.*;
 public class ServerEvents {
     private static final Logger LOGGER = LoggerFactory.getLogger(ServerEvents.class);
     private static final MobDefManager MOB_DEF_MANAGER = new MobDefManager();
+    private static final int MAX_ITERATIONS = 100;
 
     @SubscribeEvent
     public static void onServerReloading(AddReloadListenerEvent event) {
         event.addListener(MOB_DEF_MANAGER);
+        LOGGER.info("MobDefManager added as a reload listener");
     }
 
     @SubscribeEvent
-    public static void onMobSpawn(@NotNull MobSpawnEvent event) {
+    public static void onMobSpawn(@NotNull MobSpawnEvent.FinalizeSpawn event) {
         Mob entity = event.getEntity();
-        if (!(entity instanceof Mob)) {
-            return;
-        }
         ResourceLocation entityType = ForgeRegistries.ENTITY_TYPES.getKey(entity.getType());
         if (entityType == null) {
             return;
         }
-        MobDef mobDef = MobRenamer.getMobDefManager().getMobDef(entityType);
+        MobDef mobDef = MOB_DEF_MANAGER.getMobDef(entityType);
         if (mobDef == null) {
             return;
         }
-        if (!(entity.getSpawnType() == MobSpawnType.NATURAL)) {
-            return;
-        }
-        NameConfig selectedName = selectName(mobDef, entity);
+        NameConfig selectedName = selectName(mobDef, entity, event.getSpawnType());
         if (selectedName != null) {
             entity.setCustomName(selectedName.name());
             entity.setCustomNameVisible(true);
             applyAttributes(entity, selectedName.attributes());
         }
     }
-    private static NameConfig selectName(MobDef mobDef, LivingEntity entity) {
-        List<NameConfig> validNames = mobDef.names().stream()
-                .filter(nameConfig -> isValidForLocation(nameConfig, entity))
-                .toList();
 
-        if (validNames.isEmpty()) {
+    private static NameConfig selectName(MobDef mobDef, LivingEntity entity, MobSpawnType spawnType) {
+        List<NameConfig> allNames = mobDef.names();
+        int size = allNames.size();
+
+        if (size == 0) {
             return null;
         }
 
+        int iterations = Math.min(MAX_ITERATIONS, (int) (Math.log(size) / Math.log(2)) * 10);
+        Set<Integer> checkedIndices = new HashSet<>();
+        Random random = new Random();
+
+        for (int i = 0; i < iterations; i++) {
+            int index;
+            if (i < size) {
+                index = i;
+            } else {
+                index = random.nextInt(size);
+            }
+            while (checkedIndices.contains(index)) {
+                index = (index + 1) % size;
+            }
+            checkedIndices.add(index);
+            NameConfig nameConfig = allNames.get(index);
+            if (isValidForLocation(nameConfig, entity) && isValidForSpawnType(nameConfig, spawnType)) {
+                return nameConfig;
+            }
+        }
         if (mobDef.alwaysNamed()) {
-            double totalProbability = validNames.stream().mapToDouble(NameConfig::probability).sum();
-            double randomValue = Math.random() * totalProbability;
-            double cumulativeProbability = 0.0;
-            for (NameConfig nameConfig : validNames) {
-                cumulativeProbability += nameConfig.probability();
-                if (randomValue < cumulativeProbability) {
-                    return nameConfig;
-                }
-            }
-            return validNames.get(validNames.size() - 1); // Fallback to last name if rounding errors occur
+            return allNames.get(0);
         } else {
-            for (NameConfig nameConfig : validNames) {
-                if (Math.random() < nameConfig.probability()) {
-                    return nameConfig;
-                }
-            }
             return null;
         }
     }
@@ -105,15 +107,29 @@ public class ServerEvents {
                         return nameConfig.structures().contains(structureId);
                     });
             if (!inSpecifiedStructure) {
+                LOGGER.debug("Entity not in specified structure for NameConfig: {}", nameConfig.name().getString());
+                return false;
+            }
+        }
+
+        if (!nameConfig.biomes().isEmpty()) {
+            ResourceLocation biomeId = level.getBiome(pos).unwrapKey().orElseThrow().location();
+            if (!nameConfig.biomes().contains(biomeId)) {
+                LOGGER.debug("Entity not in specified biome for NameConfig: {}", nameConfig.name().getString());
                 return false;
             }
         }
 
         if (!nameConfig.dimensions().isEmpty() && !nameConfig.dimensions().contains(level.dimension().location())) {
+            LOGGER.debug("Entity not in specified dimension for NameConfig: {}", nameConfig.name().getString());
             return false;
         }
 
         return true;
+    }
+
+    private static boolean isValidForSpawnType(NameConfig nameConfig, MobSpawnType spawnType) {
+        return nameConfig.spawnTypes().isEmpty() || nameConfig.spawnTypes().contains(spawnType);
     }
 
     private static Map<Structure, LongSet> getStructuresAtPos(ServerLevel level, BlockPos pos) {
