@@ -2,10 +2,7 @@
 
 ## A mod to modify spawned mobs.
 
-This mod uses a JSON configuration file, making it easy to customize without needing to modify code.
-
-What's more, instead of using string to configure names.
-it allows you to use Text Component to identify all names.
+This mod uses datapack to set mobs' name and allows you to use Text Component to identify all names.
 Therefore, you can add translations to all your names.
 
 Here's an example of how you can use MobRenamer:
